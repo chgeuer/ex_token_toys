@@ -364,7 +364,7 @@ defmodule MsalTokenCacheParser do
   end
 
   def write_to_user_home!(%__MODULE__{} = msal_contents) do
-    {filename, _decrypt, encrypt, json_encode_opts} = file_location_and_encryption() |> IO.inspect()
+    {filename, _decrypt, encrypt, json_encode_opts} = file_location_and_encryption()
 
     file_contents =
       msal_contents
