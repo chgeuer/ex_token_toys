@@ -1,4 +1,6 @@
 defmodule MsalTokenCacheParser do
+  require Logger
+
   defstruct [:access_tokens, :accounts, :id_tokens, :refresh_tokens, :app_metadata]
 
   defp decode_access_token(
@@ -340,38 +342,58 @@ defmodule MsalTokenCacheParser do
     end
   end
 
-  defp file_location_and_encryption() do
+  def msal_token_cache_dir() do
+    [System.user_home!(), ".azure"]
+    |> Path.join()
+    |> Path.absname()
+  end
+
+  def msal_token_cache_file() do
+    filename =
+      case :os.type() do
+        {:win32, _} -> "msal_token_cache.bin"
+        _ -> "msal_token_cache.json"
+      end
+
+    Path.absname(Path.join([msal_token_cache_dir(), filename]))
+  end
+
+  defp encryption_and_json_settings() do
     case :os.type() do
       {:win32, _} ->
         # On Windows, the file is encrypted with DPAPI
-        {"msal_token_cache.bin", &Windows.API.DataProtection.unwrap/1,
-         &Windows.API.DataProtection.wrap/1, []}
+        {&Windows.API.DataProtection.unwrap/1, &Windows.API.DataProtection.wrap/1, []}
 
       _ ->
         # On Linux and Mac, the JSON file is not encrypted
-        {"msal_token_cache.json", &Function.identity/1, &Function.identity/1, [pretty: true]}
+        {&Function.identity/1, &Function.identity/1, [pretty: true]}
     end
   end
 
   def load_from_user_home() do
-    {filename, decrypt, _encrypt, _json_encode_opts} = file_location_and_encryption()
+    with filename = msal_token_cache_file(),
+         {decrypt, _encrypt, _json_encode_opts} <- encryption_and_json_settings(),
+         {:ok, contents} <- File.read(filename),
+         contents <- contents |> decrypt.(),
+         {:ok, contents} <- Jsonrs.decode(contents),
+         contents <- contents |> decode_file() do
+      Logger.info("Loaded token cache from #{filename}")
 
-    Path.join([System.user_home!(), ".azure", filename])
-    |> File.read!()
-    |> decrypt.()
-    |> Jsonrs.decode!()
-    |> decode_file()
+      {:ok, contents}
+    else
+      err -> err
+    end
   end
 
-  def write_to_user_home!(%__MODULE__{} = msal_contents) do
-    {filename, _decrypt, encrypt, json_encode_opts} = file_location_and_encryption()
-
-    file_contents =
-      msal_contents
-      |> encode_file()
-      |> Jsonrs.encode!(json_encode_opts)
-      |> encrypt.()
-
-    File.write!(Path.join([System.user_home!(), ".azure", filename]), file_contents)
+  def write_to_user_home(%__MODULE__{} = contents) do
+    with filename = msal_token_cache_file(),
+         {_decrypt, encrypt, json_encode_opts} <- encryption_and_json_settings(),
+         {:ok, contents} <- contents |> encode_file() |> Jsonrs.encode(json_encode_opts),
+         contents <- contents |> encrypt.(),
+         {:ok, _} <- File.write(filename, contents) do
+      :ok
+    else
+      err -> err
+    end
   end
 end

@@ -14,7 +14,8 @@ defmodule AadRefresher.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :fs, :observer, :wx, :runtime_tools],
+      mod: {MsalTokenCache, []}
     ]
   end
 
@@ -24,9 +25,12 @@ defmodule AadRefresher.MixProject do
       {:ex_windows_api_dataprotection, "~> 0.1.2"},
       {:jason, "~> 1.4"},
       {:jsonrs, "~> 0.3.3"},
+      {:finch, "~> 0.17.0"},
       {:req, "~> 0.4.8"},
       {:jose, "~> 1.11"},
-      {:jose_utils, "~> 0.4.0"}
+      {:jose_utils, "~> 0.4.0"},
+      {:fs, "~> 8.6"},
+      {:bandit, "~> 1.1"}
     ]
   end
 end
