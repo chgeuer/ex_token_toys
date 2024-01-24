@@ -30,7 +30,8 @@ defmodule AadRefresher.MixProject do
       {:jose, "~> 1.11"},
       {:jose_utils, "~> 0.4.0"},
       {:fs, "~> 8.6"},
-      {:bandit, "~> 1.1"}
+      {:bandit, "~> 1.1"},
+      {:kino, "~> 0.12.3"}
     ]
   end
 end
