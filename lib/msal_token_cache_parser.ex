@@ -327,7 +327,7 @@ defmodule MsalTokenCacheParser do
   end
 
   def get_refresh_token_by_username(%__MODULE__{} = state, username) do
-    matching_refresh_tokens = 
+    matching_refresh_tokens =
       state
       |> refresh_tokens()
       |> get_in([username])
@@ -384,7 +384,6 @@ defmodule MsalTokenCacheParser do
 
     refresh_tokens
   end
-
 
   def msal_token_cache_dir() do
     [System.user_home!(), ".azure"]
