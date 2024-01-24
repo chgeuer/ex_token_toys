@@ -1,0 +1,40 @@
+# Entra Domain Discovery
+
+```elixir
+Mix.install([
+  {:ex_token_toys, github: "chgeuer/ex_token_toys"}, 
+  # {:ex_token_toys, path: "C:\\github\\chgeuer\\ex_token_toys"}
+  {:kino, "~> 0.12.3"}
+])
+```
+
+## Trying it out
+
+This is an Elixir version of https://aadinternals.com/osint/
+
+```elixir
+Entra.Discovery.get_tenant_id_for_domain("sap.com")
+|> IO.inspect(label: :tenant_id)
+
+Entra.Discovery.get_all_domains("sap.com")
+|> IO.inspect(label: :domains)
+```
+
+## Run
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+domain_text_input = Kino.Input.text("Please enter the domain, like microsoft.com")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+case Kino.Input.read(domain_text_input) |> String.trim() do
+  nil -> "**Please enter a domain**"
+  "" -> "**Please enter a domain**"
+  domain -> Entra.Kino.render_domain_as_markdown_text(domain)
+end
+|> Kino.Markdown.new()
+```

@@ -1,0 +1,24 @@
+
+@domain = microsoft.com
+
+### 
+
+POST https://autodiscover-s.outlook.com/autodiscover/autodiscover.svc
+Content-Type: text/xml; charset=utf-8
+SOAPAction: "http://schemas.microsoft.com/exchange/2010/Autodiscover/Autodiscover/GetFederationInformation"
+
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+ <soap:Header xmlns:a="http://www.w3.org/2005/08/addressing">
+  <a:Action soap:mustUnderstand="1">http://schemas.microsoft.com/exchange/2010/Autodiscover/Autodiscover/GetFederationInformation</a:Action>
+  <a:To soap:mustUnderstand="1">https://autodiscover-s.outlook.com/autodiscover/autodiscover.svc</a:To>
+  <a:ReplyTo>
+   <a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address>
+  </a:ReplyTo>
+ </soap:Header>
+ <soap:Body>
+  <GetFederationInformationRequestMessage xmlns="http://schemas.microsoft.com/exchange/2010/Autodiscover">
+   <Request><Domain>{{domain}}</Domain></Request>
+  </GetFederationInformationRequestMessage>
+ </soap:Body>
+</soap:Envelope>
