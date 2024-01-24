@@ -326,8 +326,20 @@ defmodule MsalTokenCacheParser do
     end
   end
 
+  def get_refresh_token_by_username(%__MODULE__{} = state, username) do
+    matching_refresh_tokens = 
+      state
+      |> refresh_tokens()
+      |> get_in([username])
+
+    case matching_refresh_tokens do
+      nil -> :no_found
+      refresh_token -> {:ok, refresh_token}
+    end
+  end
+
   def update_refresh_token(
-        %MsalTokenCacheParser{refresh_tokens: refresh_tokens} = msal_contents,
+        %__MODULE__{refresh_tokens: refresh_tokens} = msal_contents,
         %{key: new_key} = new_refresh_token
       ) do
     case refresh_tokens |> Enum.find_index(fn %{key: old_key} -> old_key == new_key end) do
@@ -341,6 +353,38 @@ defmodule MsalTokenCacheParser do
         }
     end
   end
+
+  def refresh_tokens(%__MODULE__{} = state) do
+    %{accounts: accounts, refresh_tokens: refresh_tokens} = state
+
+    accounts_by_home_account_id =
+      accounts
+      |> Enum.map(fn account = %{home_account_id: home_account_id} ->
+        {home_account_id, account}
+      end)
+      |> Map.new()
+
+    #
+    # Augment the refresh_token with the username
+    #
+    refresh_tokens =
+      refresh_tokens
+      |> Enum.map(fn refresh_token = %{home_account_id: home_account_id} ->
+        {:ok, account} =
+          accounts_by_home_account_id
+          |> Map.fetch(home_account_id)
+
+        refresh_token =
+          refresh_token
+          |> Map.put(:username, account.username)
+
+        {account.username, refresh_token}
+      end)
+      |> Map.new()
+
+    refresh_tokens
+  end
+
 
   def msal_token_cache_dir() do
     [System.user_home!(), ".azure"]
