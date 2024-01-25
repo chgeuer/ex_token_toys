@@ -1,4 +1,8 @@
 defmodule MarkdownHelper do
+
+  defp as_str(x) when is_binary(x), do: x
+  defp as_str(x), do: "#{inspect{x}}"
+    
     @doc ~S"""
     Formats a row in a Markdown table.
   
@@ -9,6 +13,7 @@ defmodule MarkdownHelper do
     """
     def row(data) do
       data
+      |> Enum.map(&as_str/1)
       |> Enum.join(" | ")
       |> (fn x -> "| #{x} |" end).()
     end
