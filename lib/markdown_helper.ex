@@ -73,6 +73,8 @@ defmodule MarkdownHelper do
       "| Column A | Column B |\n| --- | --- |\n| a1 | b1 |\n| a2 | b2 |"
     """
     def create_markdown_table(items, indexes), do: create_markdown_table(items, indexes, indexes)
+    def create_markdown_table(items, indexes, []), do: create_markdown_table(items, indexes, indexes)
+    def create_markdown_table(items, indexes, nil), do: create_markdown_table(items, indexes, indexes)
     def create_markdown_table(items, indexes, column_names) when is_list(items) and is_list(indexes) and is_list(column_names) do
       [row(column_names) | [sep(indexes) | table_body(items, indexes)]]
       |> Enum.join("\n")
