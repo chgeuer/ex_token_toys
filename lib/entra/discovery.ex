@@ -123,6 +123,12 @@ defmodule Entra.Discovery do
     }
   end
 
+  def get_default_domain_name(graph_client, tenant_id) do
+    graph_client
+    |> find_tenantInformation_by_tenant_id(tenant_id)
+    |> get_in([:default_domain_name])
+  end
+
   def audience(:graph), do: "https://graph.microsoft.com//.default offline_access openid profile"
 
   def audience(:arm),
