@@ -22,7 +22,7 @@ defmodule AadRefresher.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ex_windows_api_dataprotection, "~> 0.1.2"},
+      {:ex_windows_api_dataprotection, "~> 0.1.3"},
       {:jason, "~> 1.4"},
       {:jsonrs, "~> 0.3.3"},
       {:finch, "~> 0.17.0"},
