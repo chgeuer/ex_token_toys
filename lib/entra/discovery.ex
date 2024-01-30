@@ -137,7 +137,7 @@ defmodule Entra.Discovery do
   def audience(:storage), do: "https://storage.azure.com//.default offline_access openid profile"
   def audience(:keyvault), do: "https://vault.azure.net//.default offline_access openid profile"
 
-  def get_client(username, aud) when is_atom(aud) do
+  def get_client(username, aud, req \\ Req.new()) when is_atom(aud) do
     state = MsalTokenCache.get_state()
 
     {:ok, refresh_token} =
@@ -150,7 +150,7 @@ defmodule Entra.Discovery do
         "access_token" => graph_access_token
       }
     } =
-      Req.new()
+      req
       |> Req.post!(
         url: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
         form: [
@@ -162,7 +162,7 @@ defmodule Entra.Discovery do
         ]
       )
 
-    Req.new()
+    req
     |> Req.Request.put_header("Authorization", "Bearer #{graph_access_token}")
   end
 
