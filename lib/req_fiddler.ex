@@ -11,4 +11,7 @@ defmodule Req.Fiddler do
 
     Req.new(connect_options: mint_connect_options)
   end
+
+  def proxy_on_beam(),
+    do: fiddler_req("127.0.0.1", 8888, Path.join([System.user_home!(), "FiddlerRoot.pem"]))
 end

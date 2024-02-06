@@ -326,15 +326,16 @@ defmodule MsalTokenCacheParser do
     end
   end
 
-  def get_refresh_token_by_username(%__MODULE__{} = state, username) do
-    matching_refresh_tokens =
+  def get_refresh_token_by_username_and_audience(%__MODULE__{} = state, username, audience) do
+    matching_tokens = 
       state
       |> refresh_tokens()
       |> get_in([username])
-
-    case matching_refresh_tokens do
-      nil -> :no_found
-      refresh_token -> {:ok, refresh_token}
+      |> Enum.filter(&String.contains?(&1.target, audience))
+    case matching_tokens do
+      [refresh_token] -> {:ok, refresh_token}
+      [] -> :not_found
+      _ -> {:error, "Multiple matching refresh tokens found"}
     end
   end
 
@@ -380,7 +381,7 @@ defmodule MsalTokenCacheParser do
 
         {account.username, refresh_token}
       end)
-      |> Map.new()
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
 
     refresh_tokens
   end

@@ -98,72 +98,93 @@ defmodule Entra.Discovery do
   end
 
   def find_tenantInformation_by_tenant_id(%Req.Request{} = graph_client, tenant_id) do
-    %Req.Response{
-      status: 200,
-      body: %{
-        "@odata.context" =>
-          "https://graph.microsoft.com/v1.0/$metadata#microsoft.graph.tenantInformation",
-        "defaultDomainName" => default_domain_name,
-        "displayName" => display_name,
-        "federationBrandName" => federation_brand_name,
-        "tenantId" => ^tenant_id
-      }
-    } =
-      graph_client
-      |> Req.get!(
-        url:
-          "https://graph.microsoft.com/v1.0/tenantRelationships/findTenantInformationByTenantId(tenantId='#{tenant_id}')"
-      )
+    response = graph_client
+    |> Req.get!(
+      url:
+        "https://graph.microsoft.com/v1.0/tenantRelationships/findTenantInformationByTenantId(tenantId='#{tenant_id}')"
+    )
 
-    %{
-      tenant_id: tenant_id,
-      default_domain_name: default_domain_name,
-      display_name: display_name,
-      federation_brand_name: federation_brand_name
-    }
+    case response do
+      %Req.Response{status: 404} -> {:error, :not_found}
+      %Req.Response{
+        status: 200,
+        body: %{
+          "@odata.context" =>
+            "https://graph.microsoft.com/v1.0/$metadata#microsoft.graph.tenantInformation",
+          "defaultDomainName" => default_domain_name,
+          "displayName" => display_name,
+          "federationBrandName" => federation_brand_name,
+          "tenantId" => ^tenant_id
+        }
+      } -> 
+        {:ok, %{
+          tenant_id: tenant_id,
+          default_domain_name: default_domain_name,
+          display_name: display_name,
+          federation_brand_name: federation_brand_name
+        } }
+      %Req.Response{status: status, body: body} -> {:error, %{ status: status, body: body}}
+    end
   end
 
   def get_default_domain_name(graph_client, tenant_id) do
-    graph_client
-    |> find_tenantInformation_by_tenant_id(tenant_id)
-    |> get_in([:default_domain_name])
+    with {:ok, response } <- graph_client |> find_tenantInformation_by_tenant_id(tenant_id) do
+      { :ok, response |> get_in([:default_domain_name]) }
+    end
   end
 
-  def audience(:graph), do: "https://graph.microsoft.com//.default offline_access openid profile"
+  defp audience(:graph), do: {"management.core.windows.net", "https://graph.microsoft.com//.default offline_access openid profile"} 
+  defp audience(:arm), do: {"management.core.windows.net", "https://management.core.windows.net//.default offline_access openid profile"}
+  defp audience(:storage), do: {"management.core.windows.net", "https://storage.azure.com//.default offline_access openid profile" }
+  defp audience(:keyvault), do: {"management.core.windows.net", "https://vault.azure.net//.default offline_access openid profile" }
+  defp audience(:cxobserve), do: {"7d401da2-e710-4600-be01-f048d5e307fa", "api://7d401da2-e710-4600-be01-f048d5e307fa/user_impersonation offline_access openid profile"}
 
-  def audience(:arm),
-    do: "https://management.core.windows.net//.default offline_access openid profile"
+  defp post_request_body(:cxobserve, refresh_token, scope) do
+    post_request_body(:default, refresh_token, scope)
+    |> put_in([:form, :redirect_uri], "https://cxp.azure.com/cxobserve//auth.html")
+  end
+  defp post_request_body(_aud, refresh_token, scope) do
+    [
+      url: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      form: [
+        grant_type: :refresh_token,
+        client_info: 1,
+        scope: scope,
+        client_id: refresh_token.client_id,
+        refresh_token: refresh_token.refresh_token
+      ]
+    ]
+  end
 
-  def audience(:storage), do: "https://storage.azure.com//.default offline_access openid profile"
-  def audience(:keyvault), do: "https://vault.azure.net//.default offline_access openid profile"
+  defp add_token_request_headers(req, :cxobserve) do
+    req
+    |> Req.Request.put_headers([
+      {"Referer", "https://cxp.azure.com/"}, 
+      {"Origin", "https://cxp.azure.com"}
+    ])
+  end
+  defp add_token_request_headers(req, _aud), do: req
 
   def get_client(username, aud, req \\ Req.new()) when is_atom(aud) do
     state = MsalTokenCache.get_state()
 
+    {domain, scope} = audience(aud)
+
     {:ok, refresh_token} =
       state
-      |> MsalTokenCacheParser.get_refresh_token_by_username(username)
+      |> MsalTokenCacheParser.get_refresh_token_by_username_and_audience(username, domain)
 
     %Req.Response{
       status: 200,
       body: %{
-        "access_token" => graph_access_token
+        "access_token" => access_token
       }
-    } =
-      req
-      |> Req.post!(
-        url: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-        form: [
-          grant_type: :refresh_token,
-          client_info: 1,
-          scope: audience(aud),
-          client_id: refresh_token.client_id,
-          refresh_token: refresh_token.refresh_token
-        ]
-      )
-
+    } = req
+        |> add_token_request_headers(aud)
+        |> Req.post!(post_request_body(aud, refresh_token, scope))
+    
     req
-    |> Req.Request.put_header("Authorization", "Bearer #{graph_access_token}")
+    |> Req.Request.put_header("Authorization", "Bearer #{access_token}")
   end
 
   defp verified_domain_to_struct(%{
@@ -182,21 +203,31 @@ defmodule Entra.Discovery do
     }
   end
 
+  def get_verified_domains(_, "00000000-0000-0000-0000-000000000000"), do: {:error, "Tenant ID is not set"}
   def get_verified_domains(graph_req, tenant_id) do
     graph_response =
       graph_req
       |> Req.get!(url: "https://graph.microsoft.com/v1.0/organization/#{tenant_id}")
 
-    %Req.Response{
-      status: 200,
-      body: %{
-        "id" => ^tenant_id,
-        "verifiedDomains" => verified_domains
-      }
-    } = graph_response
+    case graph_response do
+      %Req.Response{
+        status: 200,
+        body: %{
+          "id" => ^tenant_id,
+          "verifiedDomains" => verified_domains
+        }
+      } ->
+        verified_domains
+        |> Enum.map(&verified_domain_to_struct/1)
 
-    verified_domains
-    |> Enum.map(&verified_domain_to_struct/1)
+        {:ok, verified_domains}
+
+      %Req.Response{status: 404} ->
+        {:error, :not_found}
+
+      %Req.Response{body: body} ->
+        {:error, body}
+    end
   end
 
   def get_default_domain(verified_domains) do
