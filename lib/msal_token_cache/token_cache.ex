@@ -11,6 +11,10 @@ defmodule MsalTokenCache.TokenCache do
     GenServer.call(pid, :get_state)
   end
 
+  def overwrite_state(state, pid \\ __MODULE__) do
+    GenServer.call(pid, {:overwrite_state, state})
+  end
+
   def reload_from_disk(pid \\ __MODULE__) do
     GenServer.cast(pid, :reload_from_disk)
   end
@@ -60,6 +64,11 @@ defmodule MsalTokenCache.TokenCache do
   @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
+  end
+
+  @impl true
+  def handle_call({:overwrite_state, new_state}, _from, _state) do
+    {:reply, :ok, new_state}
   end
 
   @impl true

@@ -1,6 +1,25 @@
 defmodule Req.Fiddler do
-  def fiddler_req(proxy_ip, proxy_port, proxy_cert) do
-    mint_connect_options = [
+
+  @nimble_options_definition [
+    proxy_ip: [
+      type: :string,
+      required: true,
+    ], 
+    proxy_port: [
+      type: :non_neg_integer,
+      default: 8888
+    ],
+    proxy_cert: [
+      type: :string,
+      required: true,
+    ]
+  ]
+
+  defp fiddler_connect_options(fiddler_options) do
+    {:ok, [proxy_ip: proxy_ip, proxy_port: proxy_port, proxy_cert: proxy_cert]} = 
+      NimbleOptions.validate(fiddler_options, @nimble_options_definition)
+
+    [
       proxy: {:http, proxy_ip, proxy_port, []},
       # https://hexdocs.pm/mint/Mint.HTTP.html#connect/4-transport-options
       transport_opts: [
@@ -8,10 +27,15 @@ defmodule Req.Fiddler do
         cacertfile: proxy_cert
       ]
     ]
-
-    Req.new(connect_options: mint_connect_options)
   end
 
-  def proxy_on_beam(),
-    do: fiddler_req("127.0.0.1", 8888, Path.join([System.user_home!(), "FiddlerRoot.pem"]))
+  def attach_fiddler(req, fiddler_options \\ []) do
+    req
+    |> Req.update(connect_options: fiddler_connect_options(fiddler_options))
+  end
+
+  def add_proxy_on_beam(req) do
+    attach_fiddler(req, [proxy_ip: "127.0.0.1", proxy_port: 8888, 
+      proxy_cert: Path.join([System.user_home!(), "FiddlerRoot.pem"])])
+  end
 end

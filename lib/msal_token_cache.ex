@@ -7,6 +7,8 @@ defmodule MsalTokenCache do
 
   def reload_from_disk(), do: @datastore.reload_from_disk()
 
+  def overwrite_state(state), do: @datastore.overwrite_state(state)
+
   def save_to_disk(), do: @datastore.save_to_disk()
 
   @impl true
