@@ -26,7 +26,7 @@ defmodule AadRefresher.MixProject do
       {:jason, "~> 1.4"},
       {:jsonrs, "~> 0.3.3"},
       {:finch, "~> 0.17.0"},
-      {:req, "~> 0.4.8"},
+      {:req, "~> 0.4.9"},
       {:jose, "~> 1.11"},
       {:jose_utils, "~> 0.4.0"},
       {:fs, "~> 8.6"},
