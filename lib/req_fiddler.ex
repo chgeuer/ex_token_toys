@@ -31,7 +31,7 @@ defmodule Req.Fiddler do
 
   def attach_fiddler(req, fiddler_options \\ []) do
     req
-    |> Req.update(connect_options: fiddler_connect_options(fiddler_options))
+    |> Req.merge(connect_options: fiddler_connect_options(fiddler_options))
   end
 
   def add_proxy_on_beam(req) do

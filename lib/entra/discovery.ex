@@ -165,7 +165,7 @@ defmodule Entra.Discovery do
   end
   defp add_token_request_headers(req, _aud), do: req
 
-  def get_client(username, aud, req \\ Req.new()) when is_atom(aud) do
+  def fetch_token(username, aud, req \\ Req.new()) do
     state = MsalTokenCache.get_state()
 
     {domain, scope} = audience(aud)
@@ -177,11 +177,39 @@ defmodule Entra.Discovery do
     %Req.Response{
       status: 200,
       body: %{
-        "access_token" => access_token
+        "access_token" => access_token,
+        "expires_in" => expires_in,
+        "client_info" => client_info,
+        "id_token" => id_token,
+        "refresh_token" => refresh_token,
+        "scope" => scope,
+        "token_type" => "Bearer"
       }
     } = req
         |> add_token_request_headers(aud)
         |> Req.post!(post_request_body(aud, refresh_token, scope))
+
+    %{
+      "access_token" => access_token,
+      "expires_in" => expires_in,
+      "client_info" => client_info,
+      "id_token" => id_token,
+      "refresh_token" => refresh_token,
+      "scope" => scope,
+      "token_type" => "Bearer"
+    }
+  end
+
+  def get_client(username, aud, req \\ Req.new()) when is_atom(aud) do
+    %{
+      "access_token" => access_token,
+      # "expires_in" => expires_in,
+      # "client_info" => client_info,
+      # "id_token" => id_token,
+      # "refresh_token" => refresh_token,
+      # "scope" => scope,
+      # "token_type" => "Bearer"
+    } = fetch_token(username, aud, req)
     
     req
     |> Req.Request.put_header("Authorization", "Bearer #{access_token}")

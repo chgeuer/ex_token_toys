@@ -339,18 +339,65 @@ defmodule MsalTokenCacheParser do
     end
   end
 
+  defp update_access_token(state, key, access_token, iat, exp) do
+    state
+    |> Map.update!(:access_tokens, &(
+    Enum.map(&1, fn 
+        t = %{key: %{key: ^key}} -> %{t | access_token: access_token, cached_at: iat, expires_on: exp, extended_expires_on: exp}
+        t -> t
+      end)))
+  end
+
+  defp update_refresh_token(state, key, refresh_token, iat) do
+    state
+    |> Map.update!(:refresh_tokens, &(
+    Enum.map(&1, fn 
+        t = %{key: %{key: ^key}} -> %{t | refresh_token: refresh_token, last_modification_time: iat }
+        t -> t
+      end)))
+  end
+
+  defp update_id_token(state, key, id_token) do
+    state
+    |> Map.update!(:id_tokens, &(
+    Enum.map(&1, fn 
+        t = %{key: %{key: ^key}} -> %{t | id_token: id_token }
+        t -> t
+      end)))
+  end
+
+  def update_state_with_token_response(state, token_response) do
+    {:ok, %{ "appid" => app_id, "oid" => oid, "tid" => tid, "iat" => iat,  "exp" => exp }} = 
+      token_response["access_token"]
+      |> Joken.peek_claims()
+    iat = DateTime.from_unix!(iat)
+    exp = DateTime.from_unix!(exp)
+
+    key = fn (token_type, realm_handling) ->      
+      case realm_handling do
+        :tid_is_realm -> "#{oid}.#{tid}-login.microsoftonline.com-#{token_type}-#{app_id}-#{tid}-#{token_response["scope"]}"
+        :empty_realm -> "#{oid}.#{tid}-login.microsoftonline.com-#{token_type}-#{app_id}--#{token_response["scope"]}"
+      end
+    end
+
+    state
+    |> update_id_token(key.("idtoken", :tid_is_realm), token_response["id_token"])
+    |> update_access_token(key.("accesstoken", :tid_is_realm), token_response["access_token"], iat, exp)
+    |> update_refresh_token(key.("refreshtoken", :empty_realm), token_response["refresh_token"], iat)
+  end
+
   def update_refresh_token(
-        %__MODULE__{refresh_tokens: refresh_tokens} = msal_contents,
+        %__MODULE__{} = msal_contents,
         %{key: new_key} = new_refresh_token
       ) do
-    case refresh_tokens |> Enum.find_index(fn %{key: old_key} -> old_key == new_key end) do
+    case msal_contents.refresh_tokens |> Enum.find_index(fn %{key: old_key} -> old_key == new_key end) do
       nil ->
         msal_contents
 
       index ->
         %{
           msal_contents
-          | refresh_tokens: refresh_tokens |> List.replace_at(index, new_refresh_token)
+          | refresh_tokens: msal_contents.refresh_tokens |> List.replace_at(index, new_refresh_token)
         }
     end
   end
@@ -414,28 +461,42 @@ defmodule MsalTokenCacheParser do
     end
   end
 
-  def load_from_user_home() do
+  def load_pure_contents_from_user_home() do
     with filename = msal_token_cache_file(),
          {decrypt, _encrypt, _json_encode_opts} <- encryption_and_json_settings(),
          {:ok, contents} <- File.read(filename),
          contents <- contents |> decrypt.(),
-         {:ok, contents} <- Jsonrs.decode(contents),
-         contents <- contents |> decode_file() do
-      Logger.info("Loaded token cache from #{filename}")
-
+         {:ok, contents} <- Jsonrs.decode(contents) do
       {:ok, contents}
     else
       err -> err
     end
   end
 
-  def write_to_user_home(%__MODULE__{} = contents) do
+  def load_from_user_home() do
+    with {:ok, contents} <- load_pure_contents_from_user_home(),
+         contents <- contents |> decode_file() do
+      {:ok, contents}
+    else
+      err -> err
+    end
+  end
+
+  def write_plaintext_to_user_home(contents) when is_binary(contents) do
     with filename = msal_token_cache_file(),
-         {_decrypt, encrypt, json_encode_opts} <- encryption_and_json_settings(),
-         {:ok, contents} <- contents |> encode_file() |> Jsonrs.encode(json_encode_opts),
-         contents <- contents |> encrypt.(),
-         {:ok, _} <- File.write(filename, contents) do
-      :ok
+         {_decrypt, encrypt, _json} <- encryption_and_json_settings(),
+         contents <- contents |> encrypt.() do
+      File.write(filename, contents)
+    else
+      err -> err
+    end
+  end
+
+  def write_to_user_home(%__MODULE__{} = contents) do
+    with {_decrypt, _encrypt, json_encode_opts} <- encryption_and_json_settings(),
+         {:ok, byte_contents} <- contents |> encode_file() |> Jsonrs.encode(json_encode_opts),
+         :ok <- write_plaintext_to_user_home(byte_contents) do
+      contents
     else
       err -> err
     end
