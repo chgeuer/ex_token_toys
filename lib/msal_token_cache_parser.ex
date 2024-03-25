@@ -327,11 +327,12 @@ defmodule MsalTokenCacheParser do
   end
 
   def get_refresh_token_by_username_and_audience(%__MODULE__{} = state, username, audience) do
-    matching_tokens = 
+    matching_tokens =
       state
       |> refresh_tokens()
       |> get_in([username])
       |> Enum.filter(&String.contains?(&1.target, audience))
+
     case matching_tokens do
       [refresh_token] -> {:ok, refresh_token}
       [] -> :not_found
@@ -339,65 +340,64 @@ defmodule MsalTokenCacheParser do
     end
   end
 
-  defp update_access_token(state, key, access_token, iat, exp) do
+  defp update_token_where_key(state, collection, key, token)
+       when is_atom(collection) and is_binary(key) and is_map(token) do
     state
-    |> Map.update!(:access_tokens, &(
-    Enum.map(&1, fn 
-        t = %{key: %{key: ^key}} -> %{t | access_token: access_token, cached_at: iat, expires_on: exp, extended_expires_on: exp}
+    |> Map.update!(
+      collection,
+      &Enum.map(&1, fn
+        t = %{key: %{key: ^key}} -> Map.merge(t, token)
         t -> t
-      end)))
+      end)
+    )
   end
 
-  defp update_refresh_token(state, key, refresh_token, iat) do
-    state
-    |> Map.update!(:refresh_tokens, &(
-    Enum.map(&1, fn 
-        t = %{key: %{key: ^key}} -> %{t | refresh_token: refresh_token, last_modification_time: iat }
-        t -> t
-      end)))
-  end
+  def update_state_with_token_response(state, %{
+        "access_token" => access_token,
+        "id_token" => id_token,
+        "refresh_token" => refresh_token,
+        "scope" => scope
+      }) do
+    {:ok, %{"appid" => app_id, "oid" => oid, "tid" => tid, "iat" => iat, "exp" => exp}} =
+      Joken.peek_claims(access_token)
 
-  defp update_id_token(state, key, id_token) do
-    state
-    |> Map.update!(:id_tokens, &(
-    Enum.map(&1, fn 
-        t = %{key: %{key: ^key}} -> %{t | id_token: id_token }
-        t -> t
-      end)))
-  end
-
-  def update_state_with_token_response(state, token_response) do
-    {:ok, %{ "appid" => app_id, "oid" => oid, "tid" => tid, "iat" => iat,  "exp" => exp }} = 
-      token_response["access_token"]
-      |> Joken.peek_claims()
     iat = DateTime.from_unix!(iat)
     exp = DateTime.from_unix!(exp)
 
-    key = fn (token_type, realm_handling) ->      
-      case realm_handling do
-        :tid_is_realm -> "#{oid}.#{tid}-login.microsoftonline.com-#{token_type}-#{app_id}-#{tid}-#{token_response["scope"]}"
-        :empty_realm -> "#{oid}.#{tid}-login.microsoftonline.com-#{token_type}-#{app_id}--#{token_response["scope"]}"
-      end
+    key = fn token_type, realm ->
+      "#{oid}.#{tid}-login.microsoftonline.com-#{token_type}-#{app_id}-#{realm}-#{scope}"
     end
 
     state
-    |> update_id_token(key.("idtoken", :tid_is_realm), token_response["id_token"])
-    |> update_access_token(key.("accesstoken", :tid_is_realm), token_response["access_token"], iat, exp)
-    |> update_refresh_token(key.("refreshtoken", :empty_realm), token_response["refresh_token"], iat)
+    |> update_token_where_key(:id_tokens, key.("idtoken", tid), %{
+      id_token: id_token
+    })
+    |> update_token_where_key(:refresh_tokens, key.("refreshtoken", ""), %{
+      refresh_token: refresh_token,
+      last_modification_time: iat
+    })
+    |> update_token_where_key(:access_tokens, key.("accesstoken", tid), %{
+      access_token: access_token,
+      cached_at: iat,
+      expires_on: exp,
+      extended_expires_on: exp
+    })
   end
 
   def update_refresh_token(
         %__MODULE__{} = msal_contents,
         %{key: new_key} = new_refresh_token
       ) do
-    case msal_contents.refresh_tokens |> Enum.find_index(fn %{key: old_key} -> old_key == new_key end) do
+    case msal_contents.refresh_tokens
+         |> Enum.find_index(fn %{key: old_key} -> old_key == new_key end) do
       nil ->
         msal_contents
 
       index ->
         %{
           msal_contents
-          | refresh_tokens: msal_contents.refresh_tokens |> List.replace_at(index, new_refresh_token)
+          | refresh_tokens:
+              msal_contents.refresh_tokens |> List.replace_at(index, new_refresh_token)
         }
     end
   end

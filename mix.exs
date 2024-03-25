@@ -25,7 +25,7 @@ defmodule AadRefresher.MixProject do
       {:ex_windows_api_dataprotection, "~> 0.1.3"},
       {:jason, "~> 1.4"},
       {:jsonrs, "~> 0.3.3"},
-      #{:finch, "~> 0.18.0"},
+      # {:finch, "~> 0.18.0"},
       {:req, "~> 0.4.14"},
       {:jose, "~> 1.11"},
       {:joken, "~> 2.6"},

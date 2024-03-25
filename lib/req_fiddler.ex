@@ -1,22 +1,21 @@
 defmodule Req.Fiddler do
-
   @nimble_options_definition [
     proxy_ip: [
       type: :string,
-      required: true,
-    ], 
+      required: true
+    ],
     proxy_port: [
       type: :non_neg_integer,
       default: 8888
     ],
     proxy_cert: [
       type: :string,
-      required: true,
+      required: true
     ]
   ]
 
   defp fiddler_connect_options(fiddler_options) do
-    {:ok, [proxy_ip: proxy_ip, proxy_port: proxy_port, proxy_cert: proxy_cert]} = 
+    {:ok, [proxy_ip: proxy_ip, proxy_port: proxy_port, proxy_cert: proxy_cert]} =
       NimbleOptions.validate(fiddler_options, @nimble_options_definition)
 
     [
@@ -35,7 +34,10 @@ defmodule Req.Fiddler do
   end
 
   def add_proxy_on_beam(req) do
-    attach_fiddler(req, [proxy_ip: "127.0.0.1", proxy_port: 8888, 
-      proxy_cert: Path.join([System.user_home!(), "FiddlerRoot.pem"])])
+    attach_fiddler(req,
+      proxy_ip: "127.0.0.1",
+      proxy_port: 8888,
+      proxy_cert: Path.join([System.user_home!(), "FiddlerRoot.pem"])
+    )
   end
 end

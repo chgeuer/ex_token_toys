@@ -2,7 +2,7 @@ defmodule MsalTokenCache.TokenRetriever do
   require Logger
   use GenServer
 
-  #@datastore MsalTokenCache.TokenCache
+  # @datastore MsalTokenCache.TokenCache
 
   defstruct [:audience]
 
@@ -34,6 +34,6 @@ defmodule MsalTokenCache.TokenRetriever do
 
   defp ok(arg), do: {:ok, arg}
 
-  #defp noreply(state), do: {:noreply, state}
-  #defp reply(state, response), do: {:reply, response, state}
+  # defp noreply(state), do: {:noreply, state}
+  # defp reply(state, response), do: {:reply, response, state}
 end
