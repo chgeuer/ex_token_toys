@@ -203,44 +203,31 @@ defmodule Entra.Discovery do
 
     %Req.Response{
       status: 200,
-      body: %{
-        "access_token" => access_token,
-        "expires_in" => expires_in,
-        "client_info" => client_info,
-        "id_token" => id_token,
-        "refresh_token" => refresh_token,
-        "scope" => scope,
-        "token_type" => "Bearer"
-      }
+      body:
+        %{
+          "access_token" => _access_token,
+          "expires_in" => _expires_in,
+          "client_info" => _client_info,
+          "id_token" => _id_token,
+          "refresh_token" => _refresh_token,
+          "scope" => _scope,
+          "token_type" => "Bearer"
+        } = token_response
     } =
       req
       |> add_token_request_headers(aud)
       |> Req.post!(post_request_body(aud, refresh_token, scope))
 
-    %{
-      "access_token" => access_token,
-      "expires_in" => expires_in,
-      "client_info" => client_info,
-      "id_token" => id_token,
-      "refresh_token" => refresh_token,
-      "scope" => scope,
-      "token_type" => "Bearer"
-    }
+    token_response
   end
 
   def get_client(username, aud, req \\ Req.new()) when is_atom(aud) do
-    %{
-      "access_token" => access_token
-      # "expires_in" => expires_in,
-      # "client_info" => client_info,
-      # "id_token" => id_token,
-      # "refresh_token" => refresh_token,
-      # "scope" => scope,
-      # "token_type" => "Bearer"
-    } = fetch_token(username, aud, req)
+    token_response = fetch_token(username, aud, req)
+
+    MsalTokenCache.add_token_response(token_response)
 
     req
-    |> Req.Request.put_header("Authorization", "Bearer #{access_token}")
+    |> Req.Request.put_header("Authorization", "Bearer #{token_response["access_token"]}")
   end
 
   defp verified_domain_to_struct(%{

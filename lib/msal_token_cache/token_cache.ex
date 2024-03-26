@@ -1,4 +1,5 @@
 defmodule MsalTokenCache.TokenCache do
+  require Logger
   use GenServer
 
   # Client API
@@ -7,30 +8,34 @@ defmodule MsalTokenCache.TokenCache do
     GenServer.start_link(__MODULE__, :ok, opts)
   end
 
-  def get_state(pid \\ __MODULE__) do
-    GenServer.call(pid, :get_state)
+  def get_state() do
+    GenServer.call(__MODULE__, :get_state)
   end
 
-  def overwrite_state(state, pid \\ __MODULE__) do
-    GenServer.call(pid, {:overwrite_state, state})
+  def overwrite_state(state) do
+    GenServer.call(__MODULE__, {:overwrite_state, state})
   end
 
-  def reload_from_disk(pid \\ __MODULE__) do
-    GenServer.cast(pid, :reload_from_disk)
+  def reload_from_disk() do
+    GenServer.cast(__MODULE__, :reload_from_disk)
   end
 
-  def save_to_disk(pid \\ __MODULE__) do
-    GenServer.cast(pid, :save_to_disk)
+  def save_to_disk() do
+    GenServer.cast(__MODULE__, :save_to_disk)
+  end
+
+  def add_token_response(token_response) do
+    GenServer.call(__MODULE__, {:add_token_response, token_response})
   end
 
   # Server API
 
   @impl true
-  def init(state) do
+  def init(_state) do
     :fs.start_link(:msal_token_cache_dir, MsalTokenCacheParser.msal_token_cache_dir())
     :fs.subscribe(:msal_token_cache_dir)
 
-    {:ok, state, {:continue, :load_from_disk}}
+    {:ok, nil, {:continue, :load_from_disk}}
   end
 
   @impl true
@@ -46,6 +51,13 @@ defmodule MsalTokenCache.TokenCache do
       err ->
         raise err
     end
+  end
+
+  @impl true
+  def handle_continue(:save_to_disk, state) do
+    MsalTokenCacheParser.write_to_user_home(state)
+
+    {:noreply, state}
   end
 
   @impl true
@@ -72,6 +84,13 @@ defmodule MsalTokenCache.TokenCache do
   end
 
   @impl true
+  def handle_call({:add_token_response, token_response}, _from, state) do
+    state = MsalTokenCacheParser.update_state_with_token_response(state, token_response)
+
+    {:reply, :ok, state, {:continue, :save_to_disk}}
+  end
+
+  @impl true
   def handle_cast(:reload_from_disk, _state) do
     {:ok, state} = MsalTokenCacheParser.load_from_user_home()
 
@@ -80,7 +99,7 @@ defmodule MsalTokenCache.TokenCache do
 
   @impl true
   def handle_cast(:save_to_disk, state) do
-    :ok = MsalTokenCacheParser.write_to_user_home(state)
+    MsalTokenCacheParser.write_to_user_home(state)
 
     {:noreply, state}
   end

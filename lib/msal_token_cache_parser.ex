@@ -19,7 +19,7 @@ defmodule MsalTokenCacheParser do
           }}
        ) do
     %{
-      key: key |> parse_key(),
+      key: key |> MsalTokenCacheKey.parse(),
       cached_at: cached_at |> epoch_string_to_datetime(),
       client_id: client_id,
       environment: environment,
@@ -33,7 +33,7 @@ defmodule MsalTokenCacheParser do
   end
 
   defp encode_access_token(%{
-         key: %{key: key},
+         key: %MsalTokenCacheKey{key: key},
          cached_at: cached_at,
          client_id: client_id,
          environment: environment,
@@ -73,7 +73,7 @@ defmodule MsalTokenCacheParser do
           }}
        ) do
     %{
-      key: key |> parse_key(),
+      key: key |> MsalTokenCacheKey.parse(),
       client_id: client_id,
       environment: environment,
       family_id: family_id,
@@ -85,7 +85,7 @@ defmodule MsalTokenCacheParser do
   end
 
   defp encode_refresh_token(%{
-         key: %{key: key},
+         key: %MsalTokenCacheKey{key: key},
          client_id: client_id,
          environment: environment,
          family_id: family_id,
@@ -161,7 +161,7 @@ defmodule MsalTokenCacheParser do
           }}
        ) do
     %{
-      key: key |> parse_key(),
+      key: key |> MsalTokenCacheKey.parse(),
       id_token: id_token,
       home_account_id: home_account_id,
       environment: environment,
@@ -171,7 +171,7 @@ defmodule MsalTokenCacheParser do
   end
 
   defp encode_id_token(%{
-         key: %{key: key},
+         key: %MsalTokenCacheKey{key: key},
          id_token: id_token,
          home_account_id: home_account_id,
          environment: environment,
@@ -266,31 +266,6 @@ defmodule MsalTokenCacheParser do
     |> Integer.to_string()
   end
 
-  @key_regex ~r/^(?<oid>[0-9A-Fa-f]{8}[-]?([0-9A-Fa-f]{4}[-]?){3}[0-9A-Fa-f]{12})\.(?<tid>[0-9A-Fa-f]{8}[-]?([0-9A-Fa-f]{4}[-]?){3}[0-9A-Fa-f]{12})-(?<domain>[^-]+)-(?<type>[^-]+)-(?<app_id>[0-9A-Fa-f]{8}[-]?([0-9A-Fa-f]{4}[-]?){3}[0-9A-Fa-f]{12})-(?<realm>organizations|[0-9A-Fa-f]{8}[-]?([0-9A-Fa-f]{4}[-]?){3}[0-9A-Fa-f]{12})?-(?<scope>.*)$/
-
-  defp parse_key(key) do
-    %{
-      "app_id" => app_id,
-      "domain" => domain,
-      "oid" => oid,
-      "realm" => realm,
-      "scope" => scope,
-      "tid" => tid,
-      "type" => type
-    } = Regex.named_captures(@key_regex, key)
-
-    %{
-      key: key,
-      app_id: app_id,
-      domain: domain,
-      oid: oid,
-      realm: realm,
-      scope: scope,
-      tid: tid,
-      type: type
-    }
-  end
-
   def remove_expired_access_tokens(msal_contents),
     do: remove_expired_access_tokens(msal_contents, DateTime.utc_now())
 
@@ -365,7 +340,7 @@ defmodule MsalTokenCacheParser do
     exp = DateTime.from_unix!(exp)
 
     key = fn token_type, realm ->
-      "#{oid}.#{tid}-login.microsoftonline.com-#{token_type}-#{app_id}-#{realm}-#{scope}"
+      MsalTokenCacheKey.key_str(oid, tid, token_type, app_id, realm, scope)
     end
 
     state
